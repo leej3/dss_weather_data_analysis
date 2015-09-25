@@ -13,26 +13,49 @@ The following library's are used during the analaysis:
 ```{r}
 library(data.table)
 library(reshape2)
+library(readr)
+library(ggplot2)
 ```
 
 The data used in this report is published by the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. The database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
 
-The data was downloaded, uncompressed, loading and converted to the data.table
-datatype.
+The data was downloaded from the following URL:
 ```{r, cache = TRUE}
 file_url <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
-download.file(file_url, destfile = "storm.csv.bz2",method = "curl")
-connection<- bzfile("storm.csv.bz2")
-storm_data <- read.csv(connection)
+if(!file.exists("storm.csv.bz2")){
+    download.file(file_url, destfile = "storm.csv.bz2",method = "curl")
+    
+}
 ```
+
+The data was read using the read_csv() function from the readr package and converted to to the data.table datatype:
+```{r, results = 'hide' }
+storm_data <- data.table(read_csv("storm.csv.bz2"))
+storm_data[,BGN_DATE:= as.POSIXct(BGN_DATE,format = "%m/%e/%Y %H:%M:%S")]
+```
+
 #Results
+The data set has more than 900,000 entries with 37 variables for each entry:
+```{r}
+dim(storm_data)
+```
+
+```{r}
+# p <- ggplot(storm_data[FATALITIES>20,], aes(EVTYPE, FATALITIES ))
+# p + geom_boxplot() +
+#     ggtitle("Fatalities") + 
+#     ylab("Fatalities")
+
+health_impact <- storm_data[,.(
+    Total_fatalities = sum(FATALITIES),
+    Total_injuries = sum(INJURIES)),
+    by = EVTYPE][Total_fatalities>10]
+injury_sum <- storm_data[,.(), by = EVTYPE][Total_injuries>10]
+
+```
+
+Hello
 1-3 figures
-Show all code
-cache = TRUE
-sfjdlklkj lksdfjdljg adjfkjdsa ;flk j asl;dfjldsjf sal; ldjf lafj lsdk jl;fjdsalf  ljdf lajf; ljdfl ;ajf;
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-
     Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
 
 Across the United States, which types of events have the greatest economic consequences?
