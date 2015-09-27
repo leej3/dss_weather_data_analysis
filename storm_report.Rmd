@@ -28,31 +28,61 @@ if(!file.exists("storm.csv.bz2")){
 }
 ```
 
-The data was read using the read_csv() function from the readr package and converted to to the data.table datatype:
+The data was read using the read.csv() package function in base R and converted to the data.table datatype:
 ```{r, results = 'hide',cache=TRUE}
-storm_data <- data.table(read_csv("storm.csv.bz2"))
+connection<- bzfile("storm.csv.bz2")
+storm_data <- read.csv(connection)
+storm_data <- data.table(storm_data)
 storm_data[,BGN_DATE:= as.POSIXct(BGN_DATE,format = "%m/%e/%Y %H:%M:%S")]
 ```
+The data was subsetted for the variables required for the following analysis:
+```{r}
+s_data <- storm_data[,.(BGN_DATE, EVTYPE, FATALITIES, INJURIES, CROPDMG,CROPDMGEXP,PROPDMG,PROPDMGEXP)]
+```
+
 Pertinent to the second part of the analysis performed the following variables have no missing values:
 ```{r}
-storm_data[,which(is.na(CROPDMG))]
-storm_data[,which(is.na(CROPDMGEXP))]
-storm_data[,which(is.na(PROPDMG))]
-storm_data[,which(is.na(PROPDMGEXP))]
+s_data[,which(is.na(CROPDMG))]
+s_data[,which(is.na(CROPDMGEXP))]
+s_data[,which(is.na(PROPDMG))]
+s_data[,which(is.na(PROPDMGEXP))]
 ```
+
+
 #Results
 The data set has more than 900,000 entries with 37 variables for each entry:
 ```{r}
-dim(storm_data)
+dim(s_data)
 ```
 ## Events most harmful with respect to population health
 Between the years 1950 and 2011 the total number of deaths for each of the 985 event categories was calculated. Ordered by the total fatalities, we see that tornadoes cause both death and injury many fold higher than other events. Different categories describing excessive heat indicate this is the second most common weather in which people are injured or die. Different types of storms appear to cumulatively be the next weather event to take human lives but the different categories describing such events were not merged to provide a more thorough understanding of the impact of such events.
 ```{r,cache=TRUE}
-health_impact <- storm_data[,.(
-    Total_fatalities = sum(FATALITIES),
-    Total_injuries = sum(INJURIES)),
-    by = EVTYPE][Total_fatalities>10]
-health_impact[order(-Total_fatalities)]
+health_impact  <- s_data[,.(
+    Total_injuries = sum(INJURIES),
+    Total_fatalities = sum(FATALITIES)), 
+    by = EVTYPE][order(-Total_injuries)]
+```
+
+The effects of the top 5 events responsible for deaths during the decades of data collection are reported below with the events "HEAT" and "EXCESSIVE HEAT" merged:
+
+```{r}
+s_data[EVTYPE == "EXCESSIVE HEAT", EVTYPE := "HEAT"]
+health_impact  <- s_data[,.(
+    Total_injuries = sum(INJURIES),
+    Total_fatalities = sum(FATALITIES)), 
+    by = EVTYPE][order(-Total_injuries)]
+
+plot_data <- s_data[
+    EVTYPE %in% c("TORNADO","HEAT","FLASH FLOOD","LIGHTNING")]
+plot_data[,EVTYPE := droplevels(EVTYPE)]
+
+#plot_data <-  melt(health_impact,id = c("EVTYPE"), measure = c( "Total_fatalities","Total_injuries"))
+p <- ggplot(plot_data, aes(EVTYPE, FATALITIES))
+p + geom_boxplot() 
+    ggtitle("Comparing PM2.5 emissions from motor vehicle from two locations") + 
+    facet_grid(. ~ variable)+
+    ylab("Number of people")
+
 ```
 
 ## Events in the NOAA database with the greatest economic consequences
@@ -62,27 +92,24 @@ To summarise the account given in the report at this URL, the damage to crops ca
 
 The values that the these variables can take are:
 ```{r,cache=TRUE}
-storm_data[,unique(CROPDMGEXP)]
-storm_data[,unique(PROPDMGEXP)]
+s_data[,unique(CROPDMGEXP)]
+s_data[,unique(PROPDMGEXP)]
 ```
-The individual numbers are the exponent of scientific notation and the letters correspond to a thousand, million and billion for h (or H), m (or M) and b (or B) respectively. The multiplier vector was constructed to scale all damage values appropriately. The remaining symbols denote values that are negligible and were discarded for the analysis by simply multiplying the damage value by zero. A list of events with the greatest economic shows tornados to once again be the most damaging. Values reported for damage are in the unit of billions of U.S. dollars :
+The individual numbers are the exponent of scientific notation and the letters correspond to a thousand, million and billion for h (or H), m (or M) and b (or B) respectively. The multiplier vector was constructed to scale all damage values appropriately. The remaining symbols denote values that are negligible and were discarded for the analysis by simply multiplying the damage value by zero. A list of events that cumulatively caused greater than 50 billion dollars of damage are shown below. The most devestating is once again tornados. Values reported for damage are in the unit of billions of U.S. dollars :
 
 ```{r}
 multiplier <- c("?" = 0, "+" = 0, "-"= 0,  "0"= 1, "1"= 10, "2"= 100, "3"= 1000, "4"= 10000, "5"= 100000, "6"= 1000000, "7"= 10000000, "8"= 100000000, "B"= 1000000, "h"= 100, "H"= 100, "K"= 1000, "m"= 1000000, "M"=1000000 )
-economic_impact <- storm_data[,
+economic_impact <- s_data[,
         .(Crop_damage = sum(na.omit(CROPDMG * multiplier[CROPDMGEXP])/(1*10^9)),
         Property_damage = sum(na.omit(PROPDMG * multiplier[PROPDMGEXP]))/(1*10^9)), 
         by = EVTYPE]
 economic_impact <- economic_impact[,
             Total_damage := Property_damage+Crop_damage][order(-Total_damage)]
-economic_impact[Total_damage>100]
+economic_impact[Total_damage>50]
+```
+Just as with the population data a large number of events related to winds have a high impact. Excluding tornados, events related to wind are summarised below. They are selected in a crude manner by simply selecting for events containing the word "wind" in their title. This includes a broad spectrum of events including "HIGH WINDS DUST STORM", "EXTREME WIND CHILLS"" and "THUNDERSTORM WINDS LIGHTNING"" The number of event types and the total damage caused by them (in billions of U.S. dollars) is reported below:
+```{r}
+economic_impact[grep("WIND",EVTYPE),{print(.N) ; sum(Total_damage)} ]
 ```
 
 
-
-
-
-
-df$CROPDMG <- multiplier[df$CROPDMGEXP], where multiplier is a numeric vector such that
-
-Across the United States, which types of events have the greatest economic consequences?
