@@ -5,15 +5,13 @@ date: "24 September 2015"
 output: html_document
 ---
 
-Synopsis here: 10 sentences summarising analysis
+This report summarises the effect of extreme weather events in the U.S. on society. The U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database was used to assess this. The effect of population health was assessed by analysing the number of injuries and deaths caused by extreme weather events. The economic impact of these events was assessed by the estimated cost of the damage to both crops and property. In both estimates, tornados prove to be most devastating.
 
 
 # Data Processing
-The following library's are used during the analaysis:
+The following librariess are used during the analaysis:
 ```{r}
 library(data.table)
-library(reshape2)
-library(readr)
 library(ggplot2)
 ```
 
@@ -24,7 +22,6 @@ The data was downloaded from the following URL:
 file_url <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
 if(!file.exists("storm.csv.bz2")){
     download.file(file_url, destfile = "storm.csv.bz2",method = "curl")
-    
 }
 ```
 
@@ -33,14 +30,19 @@ The data was read using the read.csv() package function in base R and converted 
 connection<- bzfile("storm.csv.bz2")
 storm_data <- read.csv(connection)
 storm_data <- data.table(storm_data)
-storm_data[,BGN_DATE:= as.POSIXct(BGN_DATE,format = "%m/%e/%Y %H:%M:%S")]
 ```
+The data set has more than 900,000 entries with 37 variables for each entry:
+```{r}
+dim(storm_data)
+```
+
 The data was subsetted for the variables required for the following analysis:
 ```{r}
 s_data <- storm_data[,.(BGN_DATE, EVTYPE, FATALITIES, INJURIES, CROPDMG,CROPDMGEXP,PROPDMG,PROPDMGEXP)]
+remove(storm_data)
 ```
 
-Pertinent to the second part of the analysis performed the following variables have no missing values:
+Pertinent to the second part of the analysis performed, the following variables have no missing values:
 ```{r}
 s_data[,which(is.na(CROPDMG))]
 s_data[,which(is.na(CROPDMGEXP))]
@@ -50,37 +52,30 @@ s_data[,which(is.na(PROPDMGEXP))]
 
 
 #Results
-The data set has more than 900,000 entries with 37 variables for each entry:
-```{r}
-dim(s_data)
-```
+
 ## Events most harmful with respect to population health
-Between the years 1950 and 2011 the total number of deaths for each of the 985 event categories was calculated. Ordered by the total fatalities, we see that tornadoes cause both death and injury many fold higher than other events. Different categories describing excessive heat indicate this is the second most common weather in which people are injured or die. Different types of storms appear to cumulatively be the next weather event to take human lives but the different categories describing such events were not merged to provide a more thorough understanding of the impact of such events.
+Between the years 1950 and 2011 the total number of deaths for each of the 985 event categories was calculated. Events that cumulatively caused more than 50 fatalities are listed below. We see that tornadoes cause both death and injury many fold higher than other events. Different categories describing excessive heat indicate this is the second most common weather in which people are injured or die. Different types of storms appear to cumulatively be the next weather event to take human lives but the different categories describing such events were not merged to provide a more thorough understanding of the impact of such events.
 ```{r,cache=TRUE}
 health_impact  <- s_data[,.(
+    Number_of_events = .N,
     Total_injuries = sum(INJURIES),
     Total_fatalities = sum(FATALITIES)), 
     by = EVTYPE][order(-Total_injuries)]
+health_impact[Total_fatalities>50]
 ```
 
-The effects of the top 5 events responsible for deaths during the decades of data collection are reported below with the events "HEAT" and "EXCESSIVE HEAT" merged:
+The fatalities of the top 5 events responsible for deaths during the decades of data collection are reported below with the events "HEAT" and "EXCESSIVE HEAT" merged:
 
-```{r}
+```{r, results='hide'}
 s_data[EVTYPE == "EXCESSIVE HEAT", EVTYPE := "HEAT"]
-health_impact  <- s_data[,.(
-    Total_injuries = sum(INJURIES),
-    Total_fatalities = sum(FATALITIES)), 
-    by = EVTYPE][order(-Total_injuries)]
-
 plot_data <- s_data[
     EVTYPE %in% c("TORNADO","HEAT","FLASH FLOOD","LIGHTNING")]
 plot_data[,EVTYPE := droplevels(EVTYPE)]
 
-#plot_data <-  melt(health_impact,id = c("EVTYPE"), measure = c( "Total_fatalities","Total_injuries"))
 p <- ggplot(plot_data, aes(EVTYPE, FATALITIES))
-p + geom_boxplot() 
-    ggtitle("Comparing PM2.5 emissions from motor vehicle from two locations") + 
-    facet_grid(. ~ variable)+
+p + geom_boxplot() +
+    ggtitle("Fatalities from extreme weather events") + 
+    xlab("Event type")+
     ylab("Number of people")
 
 ```
@@ -112,4 +107,13 @@ Just as with the population data a large number of events related to winds have 
 economic_impact[grep("WIND",EVTYPE),{print(.N) ; sum(Total_damage)} ]
 ```
 
+
+Additional plot from another student. Very nice graph:
+```{r}
+p <- qplot(summ$frequency, summ$fatalities, label = summ$event)
+p + geom_smooth(method = "lm") +  scale_x_log10() + geom_text(size = 3, hjust = 0, vjust = 0) + 
+  xlab("Event frequency") + 
+  ylab("Fatalities (total)") + 
+  ggtitle("Relationship between event frequency and fatalities")
+  ```
 
